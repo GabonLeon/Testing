@@ -4,21 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Floating mini chat — Embed chat</title>
+  <style>
+    /* Snippet iframe DigiFusion = referensi URL; UI floating dari widget.js */
+    body > iframe[src*="/embed/agents/"] {
+      display: none;
+    }
+  </style>
 </head>
 <body>
   <!-- Embed chat — Floating mini chat. Paste before </body> on your website. -->
+  <iframe src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/embed/agents/7f6cf1d7-f9a4-4e47-9ae2-44b38208d4f4?mode=mini-chat" width="400" height="640" title="Agent mini chat" allow="clipboard-write"></iframe>
 
-  <script src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/widget.js"></script>
   <script>
-    RagWidget.init({
-      agentId: "d0a88d7d-ea2b-4dc7-9ae2-19caf7dc070a",
-      // Server aplikasi Anda memanggil embed-sessions dengan API key,
-      // lalu mengembalikan embed_token ke browser.
-      getToken: async () => {
-        const res = await fetch("/chat-token"); // endpoint milik aplikasi Anda
-        return (await res.json()).embed_token;
-      },
-    });
+    const embedRef = document.querySelector('iframe[src*="/embed/agents/"]');
+    if (!embedRef) {
+      throw new Error("Iframe embed DigiFusion tidak ditemukan.");
+    }
+    const embedOrigin = new URL(embedRef.src, window.location.href).origin;
+
+    const agentMatch = embedRef.src.match(/\/embed\/agents\/([0-9a-f-]{36})/i);
+    const agentId = agentMatch?.[1];
+    if (!agentId) {
+      throw new Error("Agent ID tidak ditemukan di src iframe DigiFusion.");
+    }
+
+    function initWidget() {
+      RagWidget.init({
+        agentId,
+        getToken: async () => {
+          const res = await fetch("/chat-token");
+          if (!res.ok) {
+            const detail = await res.text();
+            if (window.location.protocol === "file:") {
+              throw new Error(
+                "Buka lewat serve_chatfusion.py (http://localhost:8080/DigiFusion/ChatFusionWidget.html), bukan file://"
+              );
+            }
+            throw new Error(detail);
+          }
+          return (await res.json()).embed_token;
+        },
+      });
+    }
+
+    const widgetScript = document.createElement("script");
+    widgetScript.src = `${embedOrigin}/widget.js`;
+    widgetScript.onload = () => initWidget();
+    widgetScript.onerror = () => {
+      console.error("Gagal memuat widget.js dari", widgetScript.src);
+    };
+    document.head.appendChild(widgetScript);
   </script>
 </body>
 </html>

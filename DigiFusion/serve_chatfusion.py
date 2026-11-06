@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Proxy GET /chat-token → embed-sessions (API key dari env atau .env).
-Sesuaikan AGENT_ID + API_BASE dengan snippet Agents → API (sama seperti HTML).
+Proxy GET /chat-token → POST API_ENDPOINT (embed-sessions).
+Konfigurasi: DigiFusion/.env — API_TOKEN, API_ENDPOINT (lihat .env.example).
 """
 
 from __future__ import annotations
@@ -16,31 +16,41 @@ from pathlib import Path
 TESTING_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 
-# Salin dari Agents → API (iframe / widget) bila ganti agent
-API_BASE = "https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app"
-AGENT_ID = "d0a88d7d-ea2b-4dc7-9ae2-19caf7dc070a"
+ENV_KEYS = ("API_TOKEN", "API_ENDPOINT")
 
 CHAT_PAGE = "/DigiFusion/ChatFusion1.html"
 
 
-def load_api_key() -> str:
-    key = os.environ.get("CHATFUSION_API_KEY", "").strip()
-    if key:
-        return key
+def load_env() -> dict[str, str]:
+    out: dict[str, str] = {}
+    for key in ENV_KEYS:
+        val = os.environ.get(key, "").strip()
+        if val:
+            out[key] = val
+
     if not ENV_FILE.is_file():
-        return ""
+        return out
+
     for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        if line.startswith("CHATFUSION_API_KEY="):
-            return line.split("=", 1)[1].strip().strip("'\"")
-    return ""
+        if "=" not in line:
+            continue
+        key, _, raw = line.partition("=")
+        key = key.strip()
+        if key not in ENV_KEYS or key in out:
+            continue
+        out[key] = raw.strip().strip("'\"")
+    return out
 
 
-def embed_sessions_url() -> str:
-    base = API_BASE.rstrip("/")
-    return f"{base}/api/v1/agents/{AGENT_ID}/embed-sessions"
+def embed_sessions_url(api_endpoint: str) -> str:
+    """Terima URL penuh embed-sessions atau .../chat dari DigiFusion."""
+    url = api_endpoint.strip().rstrip("/")
+    if url.endswith("/chat"):
+        return url[: -len("/chat")] + "/embed-sessions"
+    return url
 
 
 class ChatFusionHandler(SimpleHTTPRequestHandler):
@@ -69,19 +79,24 @@ class ChatFusionHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def _handle_chat_token(self) -> None:
-        api_key = load_api_key()
-        if not api_key:
+        cfg = load_env()
+        api_token = cfg.get("API_TOKEN", "")
+        api_endpoint = cfg.get("API_ENDPOINT", "")
+
+        if not api_token or not api_endpoint:
             self.send_error(
                 500,
-                "Set CHATFUSION_API_KEY (export) or DigiFusion/.env — see .env.example",
+                "Set API_TOKEN and API_ENDPOINT in env or DigiFusion/.env — see .env.example",
             )
             return
+
+        post_url = embed_sessions_url(api_endpoint)
 
         body = json.dumps(
             {
                 "user": {
-                    "email": "embed-demo@localhost",
-                    "name": "Embed Demo",
+                    "email": "gabonleon@localhost",
+                    "name": "Bang Gabon",
                 },
                 "access": {
                     "level": "admin",
@@ -91,12 +106,12 @@ class ChatFusionHandler(SimpleHTTPRequestHandler):
         ).encode("utf-8")
 
         req = urllib.request.Request(
-            embed_sessions_url(),
+            post_url,
             data=body,
             method="POST",
             headers={
                 "Content-Type": "application/json",
-                "X-API-Key": api_key,
+                "X-API-Key": api_token,
             },
         )
 
@@ -129,7 +144,7 @@ def main() -> None:
     print(f"Serving {TESTING_ROOT} at http://localhost:{port}/")
     print(f"Normal iframe: http://localhost:{port}/DigiFusion/ChatFusion1.html")
     print(f"Mini widget:   http://localhost:{port}/DigiFusion/ChatFusionWidget.html")
-    print("Token API: DigiFusion/.env (CHATFUSION_API_KEY=xxxxx)")
+    print("Token API: DigiFusion/.env (API_TOKEN, API_ENDPOINT)")
     server.serve_forever()
 
 

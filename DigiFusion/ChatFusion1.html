@@ -7,27 +7,31 @@
 </head>
 <body>
   <!-- Add this agent to your website — Normal iframe (Agents → API) -->
-  <iframe
-    id="agent-chat"
-    src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/embed/agents/d0a88d7d-ea2b-4dc7-9ae2-19caf7dc070a"
-    width="100%"
-    height="600"
-    title="Agent chat"
-    allow="clipboard-write"
-  ></iframe>
+  <iframe src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/embed/agents/7f6cf1d7-f9a4-4e47-9ae2-44b38208d4f4" width="100%" height="600" title="Agent chat" allow="clipboard-write"></iframe>
 
   <!-- iframe needs embed token from your server, handed over like widget.js (rag:token) -->
   <script>
-    const EMBED_ORIGIN = "https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app";
-    const frame = document.getElementById("agent-chat");
+    const frame = document.querySelector('iframe[src*="/embed/agents/"]');
+    if (!frame) {
+      throw new Error("Iframe embed DigiFusion tidak ditemukan.");
+    }
+    const embedOrigin = new URL(frame.src, window.location.href).origin;
 
     async function sendEmbedToken() {
       const res = await fetch("/chat-token");
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const detail = await res.text();
+        if (window.location.protocol === "file:") {
+          throw new Error(
+            "Buka lewat serve_chatfusion.py (http://localhost:8080/DigiFusion/ChatFusion1.html), bukan file://"
+          );
+        }
+        throw new Error(detail);
+      }
       const { embed_token } = await res.json();
       frame.contentWindow?.postMessage(
         { type: "rag:token", token: embed_token },
-        EMBED_ORIGIN
+        embedOrigin
       );
     }
 
@@ -36,7 +40,7 @@
     });
 
     window.addEventListener("message", (event) => {
-      if (event.origin !== EMBED_ORIGIN || event.source !== frame.contentWindow) return;
+      if (event.origin !== embedOrigin || event.source !== frame.contentWindow) return;
       if (event.data?.type === "rag:token-request") {
         void sendEmbedToken().catch(console.error);
       }
