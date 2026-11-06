@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Normal iframe — Embed chat</title>
+</head>
+<body>
+  <!-- Add this agent to your website — Normal iframe (Agents → API) -->
+  <iframe
+    id="agent-chat"
+    src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/embed/agents/d0a88d7d-ea2b-4dc7-9ae2-19caf7dc070a"
+    width="100%"
+    height="600"
+    title="Agent chat"
+    allow="clipboard-write"
+  ></iframe>
+
+  <!-- iframe needs embed token from your server, handed over like widget.js (rag:token) -->
+  <script>
+    const EMBED_ORIGIN = "https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app";
+    const frame = document.getElementById("agent-chat");
+
+    async function sendEmbedToken() {
+      const res = await fetch("/chat-token");
+      if (!res.ok) throw new Error(await res.text());
+      const { embed_token } = await res.json();
+      frame.contentWindow?.postMessage(
+        { type: "rag:token", token: embed_token },
+        EMBED_ORIGIN
+      );
+    }
+
+    frame.addEventListener("load", () => {
+      void sendEmbedToken().catch(console.error);
+    });
+
+    window.addEventListener("message", (event) => {
+      if (event.origin !== EMBED_ORIGIN || event.source !== frame.contentWindow) return;
+      if (event.data?.type === "rag:token-request") {
+        void sendEmbedToken().catch(console.error);
+      }
+    });
+  </script>
+</body>
+</html>

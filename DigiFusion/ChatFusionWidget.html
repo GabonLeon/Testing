@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Floating mini chat — Embed chat</title>
+</head>
+<body>
+  <!-- Embed chat — Floating mini chat. Paste before </body> on your website. -->
+
+  <script src="https://ppn-rag-console-fe-dev-431311422997.asia-southeast2.run.app/widget.js"></script>
+  <script>
+    RagWidget.init({
+      agentId: "d0a88d7d-ea2b-4dc7-9ae2-19caf7dc070a",
+      // Server aplikasi Anda memanggil embed-sessions dengan API key,
+      // lalu mengembalikan embed_token ke browser.
+      getToken: async () => {
+        const res = await fetch("/chat-token"); // endpoint milik aplikasi Anda
+        return (await res.json()).embed_token;
+      },
+    });
+  </script>
+</body>
+</html>
